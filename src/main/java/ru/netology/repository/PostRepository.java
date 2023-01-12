@@ -1,44 +1,54 @@
 package ru.netology.repository;
 
 import org.springframework.stereotype.Repository;
+import ru.netology.exception.NotFoundException;
 import ru.netology.model.Post;
 
-import java.util.Collection;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-
 @Repository
 public class PostRepository {
-    private final Map<Long, Post> allPosts;
-    private final AtomicLong idCounter = new AtomicLong();
 
-    public PostRepository() {
-        this.allPosts = new ConcurrentHashMap<>();
-    }
+    private final AtomicLong id = new AtomicLong(0);
+    private final ConcurrentHashMap<AtomicLong, Post> posts = new ConcurrentHashMap<>();
 
-    public Collection<Post> all() {
-        return allPosts.values();
+    public List<Post> all() {
+        return new ArrayList<>(posts.values());
     }
 
     public Optional<Post> getById(long id) {
-        return Optional.ofNullable(allPosts.get(id));
+        AtomicLong tempAtomic = new AtomicLong(id);
+        return Optional.ofNullable(posts.get(tempAtomic));
     }
 
-    public Post save(Post savePost) {
-        if (savePost.getId() == 0) {
-            long id = idCounter.incrementAndGet();
-            savePost.setId(id);
-            allPosts.put(id, savePost);
-        } else if (savePost.getId() != 0) {
-            Long currentId = savePost.getId();
-            allPosts.put(currentId, savePost);
+    public Post save(Post post) {
+
+        long postID = post.getId();
+
+        if (postID == 0) {
+            id.getAndIncrement();
+            posts.put(id, post);
         }
-        return savePost;
+
+        if (postID != 0) {
+            AtomicLong tempAtomic = new AtomicLong(postID);
+            if (posts.containsKey(tempAtomic)) {
+                noSuchPostError(postID);
+            }
+            posts.replace(tempAtomic, post);
+        }
+        return post;
     }
 
     public void removeById(long id) {
-        allPosts.remove(id);
+        posts.remove(new AtomicLong(id));
+    }
+
+    public void noSuchPostError(long id) {
+        String msg = "Post with ID {" + id + "} not found";
+        throw new NotFoundException(msg);
     }
 }
